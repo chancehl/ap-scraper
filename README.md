@@ -5,5 +5,7 @@ Downloads the latest images from Reddit's [/r/ArtPorn] community and saves them 
 ## Features
 
 [x] Download images from the homepage of https://reddit.com/r/ArtPorn and save them to disk
+
 [ ] Parse artwork title from post
+
 [ ] Parse artwork resolution from post 
