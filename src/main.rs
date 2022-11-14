@@ -36,7 +36,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
             .unwrap();
 
         if Regex::new(r"^https://i.redd.it/").unwrap().is_match(url) {
-            download_file(&url).await?
+            download_file(&url).await?;
         }
     }
 
