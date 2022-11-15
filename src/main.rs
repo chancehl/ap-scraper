@@ -1,16 +1,29 @@
+use clap::Parser;
 use constants::{REDDIT_CDN_ASSET_REGEX, REDDIT_URL, SUBREDDIT_URL};
 use file::{ImageDownloadResult, ImageDownloader};
 use regex::Regex;
 use reporter::Report;
 use scraper::Selector;
-use std::error::Error;
+use std::{error::Error, path};
 
 mod constants;
 mod file;
 mod reporter;
 
+/// A simple program for scraping https://reddit.com/r/artporn for high-resolution art.
+#[derive(Parser, Debug)]
+#[clap(author, version, about, long_about = None)]
+struct Args {
+    /// The loation to save the file
+    #[clap(short, long, default_value = "./imgs")]
+    outdir: path::PathBuf,
+}
+
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn Error>> {
+    let args = Args::parse();
+    let outdir = args.outdir;
+
     let list_page_html = get_html(SUBREDDIT_URL).await?;
     let list_page_document = scraper::Html::parse_document(&list_page_html);
 
@@ -43,7 +56,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
             .unwrap();
 
         if Regex::new(REDDIT_CDN_ASSET_REGEX).unwrap().is_match(url) {
-            let result = ImageDownloader::download_file(&url, "./imgs").await?;
+            let result = ImageDownloader::download_file(&url, &outdir).await?;
 
             results.push(result);
         } else {
@@ -55,12 +68,9 @@ async fn main() -> Result<(), Box<dyn Error>> {
     }
 
     // report
-    match Report::new(results).write_to_disk("./imgs") {
-        Ok(loc) => println!("Success! Saved report to {0}", loc),
-        Err(err) => panic!(
-            "Could not write write report to disk. Error: \n\n {:?}",
-            err
-        ),
+    match Report::new(results).write_to_disk(&outdir) {
+        Ok(loc) => println!("Success! Saved report to {:?}", loc),
+        Err(err) => panic!("Could not write write report to disk (error: {:?}).", err),
     }
 
     Ok(())

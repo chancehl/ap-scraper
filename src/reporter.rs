@@ -4,6 +4,7 @@ use serde::Serialize;
 use std::error::Error;
 use std::fs::File;
 use std::io::{BufWriter, Write};
+use std::path::PathBuf;
 
 #[derive(Serialize)]
 pub struct Report {
@@ -15,10 +16,11 @@ impl Report {
         Self { results }
     }
 
-    pub fn write_to_disk(self, dir_path: &str) -> Result<String, Box<dyn Error>> {
+    pub fn write_to_disk(self, dir: &PathBuf) -> Result<PathBuf, Box<dyn Error>> {
         let time = Utc::now();
-        let file_location = format!("{0}/report-{1}.json", dir_path, time);
-        let file = File::create(&file_location)?;
+        let file_location = dir.join(format!("report-{0}.json", time));
+        println!("report = {:?}", file_location);
+        let file = File::create(dir.join(&file_location))?;
 
         let mut writer = BufWriter::new(file);
 
