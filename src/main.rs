@@ -1,8 +1,13 @@
+use file::ImageDownloadResult;
 use image::io::Reader as ImageReader;
 use regex::Regex;
+use reporter::Report;
 use scraper::Selector;
 use std::error::Error;
 use std::io::Cursor;
+
+mod file;
+mod reporter;
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn Error>> {
@@ -13,6 +18,8 @@ async fn main() -> Result<(), Box<dyn Error>> {
     let a_selector = Selector::parse("a").unwrap();
 
     let posts = list_page_document.select(&post_container_selector);
+
+    let mut results: Vec<ImageDownloadResult> = Vec::new();
 
     for post in posts {
         let a = post.select(&a_selector).next().unwrap();
@@ -36,8 +43,21 @@ async fn main() -> Result<(), Box<dyn Error>> {
             .unwrap();
 
         if Regex::new(r"^https://i.redd.it/").unwrap().is_match(url) {
-            download_file(&url).await?;
+            let result = download_file(&url).await?;
+
+            results.push(result);
+        } else {
+            println!(
+                "Skipping img {:?} because it does not pass the Reddit CDN regex check",
+                url
+            );
         }
+    }
+
+    // report
+    match Report::new(results).write_to_disk("./imgs") {
+        Ok(_) => println!("Success! Saved report to ./imgs."),
+        Err(e) => panic!("Could not write write report to disk. Error: \n\n {:?}", e),
     }
 
     Ok(())
@@ -49,7 +69,7 @@ async fn get_html(url: &str) -> Result<String, Box<dyn Error>> {
     return Ok(resp);
 }
 
-async fn download_file(url: &str) -> Result<(), Box<dyn Error>> {
+async fn download_file(url: &str) -> Result<ImageDownloadResult, Box<dyn Error>> {
     let fragments = url.split("https://i.redd.it/").collect::<Vec<&str>>();
     let name = fragments[1];
 
@@ -61,10 +81,28 @@ async fn download_file(url: &str) -> Result<(), Box<dyn Error>> {
         .with_guessed_format()?
         .decode()?;
 
-    match img.save(&path) {
-        Ok(_) => println!("Successfully downloaded image {0} (saved to ./imgs)", name),
-        Err(e) => panic!("Failed to download image: {0}", e),
+    let file = match img.save(&path) {
+        Ok(_) => {
+            println!("Successfully downloaded image {0} (saved to ./imgs)", name);
+
+            ImageDownloadResult {
+                name: name.to_string(),
+                path: path,
+                saved: true,
+                error: None,
+            }
+        }
+        Err(e) => {
+            println!("Failed to download image {0}", name);
+
+            ImageDownloadResult {
+                name: name.to_string(),
+                path: path,
+                saved: false,
+                error: Some(e.to_string()),
+            }
+        }
     };
 
-    Ok(())
+    Ok(file)
 }
