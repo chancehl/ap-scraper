@@ -1,10 +1,8 @@
-use file::ImageDownloadResult;
-use image::io::Reader as ImageReader;
+use file::{ImageDownloadResult, ImageDownloader};
 use regex::Regex;
 use reporter::Report;
 use scraper::Selector;
 use std::error::Error;
-use std::io::Cursor;
 
 mod file;
 mod reporter;
@@ -43,7 +41,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
             .unwrap();
 
         if Regex::new(r"^https://i.redd.it/").unwrap().is_match(url) {
-            let result = download_file(&url).await?;
+            let result = ImageDownloader::download_file(&url, "./imgs").await?;
 
             results.push(result);
         } else {
@@ -56,8 +54,11 @@ async fn main() -> Result<(), Box<dyn Error>> {
 
     // report
     match Report::new(results).write_to_disk("./imgs") {
-        Ok(_) => println!("Success! Saved report to ./imgs."),
-        Err(e) => panic!("Could not write write report to disk. Error: \n\n {:?}", e),
+        Ok(loc) => println!("Success! Saved report to {0}", loc),
+        Err(err) => panic!(
+            "Could not write write report to disk. Error: \n\n {:?}",
+            err
+        ),
     }
 
     Ok(())
@@ -67,42 +68,4 @@ async fn get_html(url: &str) -> Result<String, Box<dyn Error>> {
     let resp = reqwest::get(url).await?.text().await?;
 
     return Ok(resp);
-}
-
-async fn download_file(url: &str) -> Result<ImageDownloadResult, Box<dyn Error>> {
-    let fragments = url.split("https://i.redd.it/").collect::<Vec<&str>>();
-    let name = fragments[1];
-
-    let path = format!("./imgs/{0}", name);
-
-    let bytes = reqwest::get(url).await?.bytes().await?;
-
-    let img = ImageReader::new(Cursor::new(bytes))
-        .with_guessed_format()?
-        .decode()?;
-
-    let file = match img.save(&path) {
-        Ok(_) => {
-            println!("Successfully downloaded image {0} (saved to ./imgs)", name);
-
-            ImageDownloadResult {
-                name: name.to_string(),
-                path: path,
-                saved: true,
-                error: None,
-            }
-        }
-        Err(e) => {
-            println!("Failed to download image {0}", name);
-
-            ImageDownloadResult {
-                name: name.to_string(),
-                path: path,
-                saved: false,
-                error: Some(e.to_string()),
-            }
-        }
-    };
-
-    Ok(file)
 }

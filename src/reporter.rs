@@ -15,16 +15,16 @@ impl Report {
         Self { results }
     }
 
-    pub fn write_to_disk(self, dir_path: &str) -> Result<(), Box<dyn Error>> {
+    pub fn write_to_disk(self, dir_path: &str) -> Result<String, Box<dyn Error>> {
         let time = Utc::now();
-        let file_name = format!("{0}/report-{1}.json", dir_path, time);
-        let file = File::create(file_name)?;
+        let file_location = format!("{0}/report-{1}.json", dir_path, time);
+        let file = File::create(&file_location)?;
 
         let mut writer = BufWriter::new(file);
 
         serde_json::to_writer(&mut writer, &self.results)?;
         writer.flush()?;
 
-        Ok(())
+        Ok(file_location)
     }
 }
