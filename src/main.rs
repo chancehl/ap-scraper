@@ -1,11 +1,13 @@
+use ap_image::{ArtPornSubredditImage, ArtPornSubredditImageMetadata};
 use clap::Parser;
 use constants::{REDDIT_CDN_ASSET_REGEX, REDDIT_URL, SUBREDDIT_URL};
-use file::{ImageDownloadResult, ImageDownloader};
+use file::ImageDownloader;
 use regex::Regex;
 use reporter::Report;
 use scraper::Selector;
 use std::{error::Error, path};
 
+mod ap_image;
 mod constants;
 mod file;
 mod reporter;
@@ -29,10 +31,11 @@ async fn main() -> Result<(), Box<dyn Error>> {
 
     let post_container_selector = Selector::parse("[data-testid=\"post-container\"]").unwrap();
     let a_selector = Selector::parse("a").unwrap();
+    let post_title_selector = Selector::parse("h1").unwrap();
 
     let posts = list_page_document.select(&post_container_selector);
 
-    let mut results: Vec<ImageDownloadResult> = Vec::new();
+    let mut processed_images: Vec<ArtPornSubredditImage> = Vec::new();
 
     for post in posts {
         let a = post.select(&a_selector).next().unwrap();
@@ -55,10 +58,22 @@ async fn main() -> Result<(), Box<dyn Error>> {
             .attr("href")
             .unwrap();
 
+        let post_title = post_container
+            .select(&post_title_selector)
+            .next()
+            .unwrap()
+            .inner_html();
+
         if Regex::new(REDDIT_CDN_ASSET_REGEX).unwrap().is_match(url) {
             let result = ImageDownloader::download_file(&url, &outdir).await?;
 
-            results.push(result);
+            let processed_image = ArtPornSubredditImage {
+                id: url.to_string(),
+                download_results: result,
+                metadata: ArtPornSubredditImageMetadata { title: post_title },
+            };
+
+            processed_images.push(processed_image);
         } else {
             println!(
                 "Skipping img {:?} because it does not pass the Reddit CDN regex check",
@@ -68,7 +83,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
     }
 
     // report
-    match Report::new(results).write_to_disk(&outdir) {
+    match Report::new(processed_images).write_to_disk(&outdir) {
         Ok(loc) => println!("Success! Saved report to {:?}", loc),
         Err(err) => panic!("Could not write write report to disk (error: {:?}).", err),
     }
