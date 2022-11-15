@@ -1,15 +1,17 @@
+use constants::{REDDIT_CDN_ASSET_REGEX, REDDIT_URL, SUBREDDIT_URL};
 use file::{ImageDownloadResult, ImageDownloader};
 use regex::Regex;
 use reporter::Report;
 use scraper::Selector;
 use std::error::Error;
 
+mod constants;
 mod file;
 mod reporter;
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn Error>> {
-    let list_page_html = get_html("https://reddit.com/r/artporn").await?;
+    let list_page_html = get_html(SUBREDDIT_URL).await?;
     let list_page_document = scraper::Html::parse_document(&list_page_html);
 
     let post_container_selector = Selector::parse("[data-testid=\"post-container\"]").unwrap();
@@ -23,7 +25,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
         let a = post.select(&a_selector).next().unwrap();
         let href = a.value().attr("href").unwrap_or("No href found");
 
-        let post_detail_url = format!("https://reddit.com{0}", href);
+        let post_detail_url = format!("{0}{1}", REDDIT_URL, href);
         let post_detail_html = get_html(&post_detail_url).await?;
         let post_detail_document = scraper::Html::parse_document(&post_detail_html);
 
@@ -40,7 +42,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
             .attr("href")
             .unwrap();
 
-        if Regex::new(r"^https://i.redd.it/").unwrap().is_match(url) {
+        if Regex::new(REDDIT_CDN_ASSET_REGEX).unwrap().is_match(url) {
             let result = ImageDownloader::download_file(&url, "./imgs").await?;
 
             results.push(result);
