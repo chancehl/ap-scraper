@@ -17,9 +17,12 @@ impl Report {
     }
 
     pub fn write_to_disk(self, dir: &PathBuf) -> Result<PathBuf, Box<dyn Error>> {
-        let time = Utc::now();
-        let file_location = dir.join(format!("report-{0}.json", time.format("%d/%m/%Y %H:%M")));
-        let file = File::create(dir.join(&file_location))?;
+        let file_location = dir.join(format!(
+            "report-{0}.json",
+            Utc::now().format("%d-%m-%Y-%H:%M")
+        ));
+
+        let file = File::create(&file_location)?;
 
         let mut writer = BufWriter::new(file);
 
